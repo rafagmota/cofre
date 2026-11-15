@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cofre</title>
+  <meta name="theme-color" content="#1f3a34">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Cofre">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topo">
+    <a href="#/" class="marca">🔒 Cofre</a>
+    <span id="estado" aria-live="polite"></span>
+    <a href="#/ajustes" class="engrenagem" aria-label="Ajustes">⚙︎</a>
+  </header>
+  <main id="app"></main>
+  <nav id="abas" hidden>
+    <a href="#/" data-aba="painel">🏠<span>Painel</span></a>
+    <a href="#/lista" data-aba="lista">📚<span>Lista</span></a>
+    <a href="#/nova" data-aba="nova" class="destaque">＋<span>Anotar</span></a>
+    <a href="#/semana" data-aba="semana">🔗<span>Semana</span></a>
+  </nav>
+  <div id="aviso" role="status" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
