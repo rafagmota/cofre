@@ -161,3 +161,84 @@ export function totais(notas) {
     arquivadas: notas.length - ativas.length,
   };
 }
+
+// ---------- números para os visuais (só leitura: contam, nunca gravam) ----------
+const ativas = (notas) => notas.filter((n) => !n.arquivada && n.criada);
+
+// Calendário: 53 semanas (segunda a domingo) terminando hoje.
+export function constancia(notas, hoje = hojeISO()) {
+  const porDia = new Map();
+  for (const n of ativas(notas)) { const d = n.criada.slice(0, 10); porDia.set(d, (porDia.get(d) || 0) + 1); }
+  const [y, m, d] = hoje.split('-').map(Number);
+  const desdeSegunda = (new Date(y, m - 1, d).getDay() + 6) % 7;
+  const inicio = addDias(hoje, -desdeSegunda - 52 * 7);
+  const dias = [];
+  for (let i = 0; i < 53 * 7; i++) {
+    const dia = addDias(inicio, i);
+    if (dia > hoje) break;
+    dias.push({ dia, n: porDia.get(dia) || 0 });
+  }
+  let sequencia = 0;
+  let c = porDia.has(hoje) ? hoje : addDias(hoje, -1);
+  while (porDia.has(c)) { sequencia++; c = addDias(c, -1); }
+  return { inicio, dias, diasComNota: dias.filter((x) => x.n > 0).length, sequencia, max: Math.max(0, ...dias.map((x) => x.n)) };
+}
+
+// Barras da semana: quantas anotações por dia e por tipo.
+export function semanaPorDia(notas, hoje = hojeISO(), dias = 7) {
+  const lista = [];
+  for (let i = dias - 1; i >= 0; i--) lista.push({ dia: addDias(hoje, -i), pensamento: 0, livro: 0, video: 0, total: 0 });
+  const porDia = new Map(lista.map((x) => [x.dia, x]));
+  for (const n of ativas(notas)) {
+    const x = porDia.get(n.criada.slice(0, 10));
+    if (x) { x[n.tipo]++; x.total++; }
+  }
+  return { dias: lista, max: Math.max(0, ...lista.map((x) => x.total)) };
+}
+
+// Estante: o que está sendo lido, o que já foi lido e a nota média dos lidos.
+export function estante(notas) {
+  const livros = ativas(notas).filter((n) => n.tipo === 'livro').sort(maisRecentesPrimeiro);
+  const lendo = livros.filter((n) => n.status === 'lendo');
+  const lidos = livros.filter((n) => n.status === 'lido');
+  const notasDosLidos = lidos.map((n) => n.nota).filter((x) => x !== null);
+  const media = notasDosLidos.length ? notasDosLidos.reduce((a, b) => a + b, 0) / notasDosLidos.length : null;
+  return { lendo, lidos, media };
+}
+
+// Mapa: tags usadas em 2+ anotações (bolhas) e quantas anotações cada par de tags divide (fios).
+export function mapaTags(notas, { desde = '', max = 10 } = {}) {
+  const base = ativas(notas).filter((n) => !desde || n.criada.slice(0, 10) >= desde);
+  const nos = contarTags(base).filter(([, q]) => q >= 2).slice(0, max).map(([tag, q]) => ({ tag, q }));
+  const nomes = new Set(nos.map((x) => x.tag));
+  const pares = new Map();
+  for (const n of base) {
+    const ts = n.tags.filter((t) => nomes.has(t)).sort();
+    for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) {
+      const k = ts[i] + '\u0000' + ts[j]; pares.set(k, (pares.get(k) || 0) + 1);
+    }
+  }
+  const fios = [...pares].map(([k, peso]) => { const [a, b] = k.split('\u0000'); return { a, b, peso }; });
+  return { nos, fios, base };
+}
+
+// Imagens: capa gerada para livro; miniatura do YouTube a partir do link (nada é gravado).
+export function hashTexto(s) {
+  let h = 5381;
+  for (const c of String(s || '')) h = ((h * 33) ^ c.codePointAt(0)) >>> 0;
+  return h;
+}
+export function idDoYoutube(link) {
+  try {
+    const u = new URL(link);
+    const h = u.hostname.replace(/^(www\.|m\.|music\.)/, '');
+    let id = '';
+    if (h === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+    else if (h === 'youtube.com' || h === 'youtube-nocookie.com') {
+      if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
+      else { const m = u.pathname.match(/^\/(shorts|embed|live|v)\/([^/?]+)/); if (m) id = m[2]; }
+    }
+    return /^[\w-]{6,15}$/.test(id) ? id : '';
+  } catch { return ''; }
+}
+export const miniaturaYoutube = (id) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;

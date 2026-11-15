@@ -1,5 +1,6 @@
 // Cofre - telas e comportamento.
 import * as L from './lib.js';
+import * as V from './visuais.js';
 import { Repositorio, REPO_PADRAO, guardarChave, abrirChave, temChaveGuardada, esquecerChave, tituloDoVideo } from './net.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -11,6 +12,7 @@ let notas = [];           // anotações já lidas
 let arvore = [];          // [{path, sha}]
 let textos = {};          // sha -> texto
 let ultimaAtualizacao = null;
+let escopoMapa = '7';     // mapa da Semana: últimos 7 dias ou tudo
 let filtro = { termo: '', tipo: '', tag: '', arquivadas: false };
 
 // ---------- guardados neste aparelho (só para acelerar; a verdade está no GitHub) ----------
@@ -167,7 +169,8 @@ function linhaNota(n, extra = '') {
 function telaPainel() {
   const hoje = L.hojeISO();
   const lembretes = L.lembretesDeHoje(notas, hoje);
-  const lendo = notas.filter((n) => !n.arquivada && n.tipo === 'livro' && n.status === 'lendo');
+  const est = L.estante(notas);
+  const cons = L.constancia(notas, hoje);
   const ultimas = [...notas].filter((n) => !n.arquivada).sort(L.maisRecentesPrimeiro).slice(0, 5);
   const t = L.totais(notas);
   app.innerHTML = `
@@ -177,13 +180,17 @@ function telaPainel() {
       <div class="cartao"><b>${t.livro}</b><span>📖 livros</span></div>
       <div class="cartao"><b>${t.video}</b><span>▶️ vídeos</span></div>
     </div>
+    <h2>Constância</h2>
+    <div class="cartao">${V.calendario(cons)}</div>
     <h2>Rever hoje</h2>
     <div class="cartao">${lembretes.length ? lembretes.map((n) => linhaNota(n, 'aviso-data')).join('') : '<div class="vazio">Nada para rever hoje.</div>'}</div>
     <h2>Lendo agora</h2>
-    <div class="cartao">${lendo.length ? lendo.map((n) => linhaNota(n)).join('') : '<div class="vazio">Nenhum livro marcado como “lendo”.</div>'}</div>
+    <div class="cartao">${est.lendo.length ? V.lendoAgora(est.lendo) : '<div class="vazio">Nenhum livro marcado como “lendo”.</div>'}</div>
+    ${est.lidos.length ? `<h2>Estante</h2><div class="cartao">${V.estanteLidos(est)}</div>` : ''}
     <h2>Últimas anotações</h2>
     <div class="cartao">${ultimas.length ? ultimas.map((n) => linhaNota(n)).join('') : '<div class="vazio">Ainda não há anotações. Toque em “Anotar”.</div>'}</div>
     ${t.arquivadas ? `<p class="suave">${t.arquivadas} arquivada(s) — veja na Lista, opção “Arquivadas”.</p>` : ''}`;
+  V.ligarCalendario(app, cons);
 }
 
 function telaLista() {
@@ -222,8 +229,10 @@ function telaNota(id) {
     <p><a href="#/lista">← Lista</a></p>
     <div class="folha ${n.arquivada ? 'arquivada' : ''}">
       <div class="suave">${L.TIPOS[n.tipo].icone} ${L.TIPOS[n.tipo].nome} · ${esc(n.criada.slice(0, 10).split('-').reverse().join('/'))}${n.arquivada ? ' · <b>ARQUIVADA</b>' : ''}</div>
+      ${n.tipo === 'video' ? `<div class="previa">${linkOk ? `<a class="mini-link" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer" aria-label="Abrir o vídeo">${V.miniaturaVideo(n.link)}</a>` : V.miniaturaVideo(n.link)}</div>` : ''}
+      ${n.tipo === 'livro' ? `<div class="cabeca">${V.capaLivro(n.titulo)}<div>` : ''}
       <h1 style="margin-top:8px">${esc(n.titulo || (n.tipo === 'pensamento' ? '' : '(sem título)'))}</h1>
-      ${n.tipo === 'livro' ? `<p class="suave">Status: ${esc(n.status || '-')} · Nota: ${n.nota ?? '-'}</p>` : ''}
+      ${n.tipo === 'livro' ? `<p class="suave">Status: ${esc(n.status || '-')} · Nota: ${n.nota ?? '-'}</p></div></div>` : ''}
       ${linkOk ? `<p><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.link)}</a></p>` : n.link ? `<p class="suave">${esc(n.link)}</p>` : ''}
       <div class="corpo">${esc(n.corpo)}</div>
       ${n.tags.length ? `<div class="chips">${n.tags.map((t) => `<a class="chip" href="#/lista" data-tag="${esc(t)}">#${esc(t)}</a>`).join('')}</div>` : ''}
@@ -239,6 +248,7 @@ function telaNota(id) {
     <p class="erro" id="erro" hidden></p>
     <h2>Relacionadas</h2>
     <div class="cartao">${rel.length ? rel.map((r) => linhaNota(r.nota)).join('') : '<div class="vazio">Nada parecido por enquanto.</div>'}</div>`;
+  V.armarImagens(app);
   document.querySelectorAll('.chip[data-tag]').forEach((c) => { c.onclick = () => { filtro = { termo: '', tipo: '', tag: c.dataset.tag, arquivadas: false }; }; });
   const mudar = async (campos, msg, ok) => {
     try { await salvarNota({ ...n, ...campos, editada: L.agoraISO() }, msg); aviso(ok); telaNota(id); }
@@ -286,6 +296,7 @@ function telaForm(tipo, existente) {
         <input id="titulo" value="${esc(n?.titulo)}">
         <label for="corpo">O que aprendi</label>
         <textarea id="corpo">${esc(n?.corpo)}</textarea>` : ''}
+      <div class="previa" id="previa"></div>
       <label for="tags">Tags</label>
       <input id="tags" value="${esc(tagsExistentes)}" placeholder="#dinheiro #habitos" autocapitalize="off">
       <div class="chips" id="sug"></div>
@@ -325,6 +336,16 @@ function telaForm(tipo, existente) {
     $('#link').onchange = buscarTitulo; $('#link').onpaste = () => setTimeout(buscarTitulo, 50);
   }
 
+  // prévia: capa do livro / miniatura do vídeo, atualizadas enquanto digita
+  const previa = $('#previa');
+  if (tipo === 'livro') {
+    const capa = () => { const t = $('#titulo').value.trim(); previa.innerHTML = t ? V.capaLivro(t) : ''; };
+    $('#titulo').addEventListener('input', capa); capa();
+  } else if (tipo === 'video') {
+    const mini = () => { const l = $('#link').value.trim(); previa.innerHTML = /^https?:\/\//i.test(l) ? V.miniaturaVideo(l) : ''; V.armarImagens(previa); };
+    $('#link').addEventListener('input', mini); $('#link').addEventListener('change', mini); mini();
+  }
+
   $('#rever').onchange = (e) => { $('#reverData').hidden = e.target.value !== 'data'; };
   if (n?.rever_em) { $('#rever').value = 'data'; $('#reverData').hidden = false; $('#reverData').value = n.rever_em; }
 
@@ -359,10 +380,13 @@ function telaSemana() {
   app.innerHTML = `
     <h1>Semana</h1>
     <p class="suave">De ${esc(r.desde.split('-').reverse().join('/'))} até hoje · ${r.daSemana.length} anotação(ões)</p>
+    <h2>Dia a dia</h2>
+    <div class="cartao">${V.barrasDaSemana(L.semanaPorDia(notas))}</div>
     <h2>Temas mais frequentes</h2>
     <div class="cartao">${r.temas.length ? `<div class="chips">${r.temas.slice(0, 12).map(([t, q]) => `<span class="chip">#${esc(t)} ×${q}</span>`).join('')}</div>` : '<div class="vazio">Sem tags nesta semana.</div>'}</div>
     <h2>Ideias que se conectam</h2>
-    <div class="cartao">${r.conexoes.length ? r.conexoes.map((c) => `<p><b>#${esc(c.tag)}</b></p>${c.notas.map((n) => linhaNota(n)).join('')}`).join('') : '<div class="vazio">Use a mesma tag em duas anotações para ver conexões aqui.</div>'}</div>
+    <div class="escopo" id="escopo">${[['7', '7 dias'], ['tudo', 'Tudo']].map(([v, r]) => `<button class="chip ${escopoMapa === v ? 'on' : ''}" data-e="${v}">${r}</button>`).join('')}</div>
+    <div class="cartao" id="mapa"></div>
     <h2>O que anotei</h2>
     <div class="cartao">${r.daSemana.length ? r.daSemana.map((n) => linhaNota(n)).join('') : '<div class="vazio">Nenhuma anotação nesta semana.</div>'}</div>
     <h2>Análise do Claude</h2>
@@ -371,6 +395,20 @@ function telaSemana() {
       <div class="acoes"><button class="b" id="copiar">Copiar para o Claude</button></div>
       <pre class="copia" id="prev">${esc(prompt)}</pre>
     </div>`;
+  const desenharMapa = () => {
+    const m = L.mapaTags(notas, { desde: escopoMapa === '7' ? r.desde : '' });
+    $('#mapa').innerHTML = m.nos.length
+      ? `${V.mapaDeTags(m)}<p class="suave">Cada bolha é uma tag usada em duas ou mais anotações; o fio liga tags que aparecem juntas. Toque numa bolha para ver as anotações.</p><div class="mapa-notas" id="mapa-notas"></div>`
+      : '<div class="vazio">Use a mesma tag em duas anotações para ver conexões aqui.</div>';
+    V.ligarMapa($('#mapa'), (tag) => {
+      const todas = tag ? m.base.filter((n) => n.tags.includes(tag)).sort(L.maisRecentesPrimeiro) : [];
+      $('#mapa-notas').innerHTML = todas.slice(0, 6).map((n) => linhaNota(n)).join('')
+        + (todas.length > 6 ? `<p class="suave"><a href="#/lista" id="ver-todas">Ver as ${todas.length} anotações de #${esc(tag)} na Lista</a></p>` : '');
+      const v = $('#ver-todas'); if (v) v.onclick = () => { filtro = { termo: '', tipo: '', tag, arquivadas: false }; };
+    });
+  };
+  desenharMapa();
+  $('#escopo').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; escopoMapa = b.dataset.e; document.querySelectorAll('#escopo .chip').forEach((c) => c.classList.toggle('on', c === b)); desenharMapa(); };
   $('#copiar').onclick = async () => {
     try { await navigator.clipboard.writeText(prompt); aviso('Copiado! Cole no Claude.'); }
     catch { const s = window.getSelection(), rg = document.createRange(); rg.selectNodeContents($('#prev')); s.removeAllRanges(); s.addRange(rg); aviso('Selecionei o texto: copie manualmente.', 4000); }
