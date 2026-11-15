@@ -5,7 +5,7 @@
 :root {
   --fundo: #f6f0e4; --vidro: rgba(246, 240, 228, .88); --folha: #fcf9f2; --texto: #2d2823; --suave: #675e53; --linha: #e3dac9;
   --destaque: #4f6552; --sobre: #ffffff; --aviso: #9b4332; --chip: #ece4d3; --sombra: 0 1px 2px rgba(60, 45, 20, .06), 0 8px 24px rgba(60, 45, 20, .07);
-  --t-pensamento: #4f6552; --t-livro: #a07a3f; --t-video: #5f7384; --t-curso: #86617b; --t-evento: #a8523f;
+  --t-pensamento: #4f6552; --t-livro: #a07a3f; --t-video: #5f7384; --t-curso: #86617b; --t-evento: #a8523f; --t-trecho: #7a6a36;
   --c0: #8a5f2b; --c1: #6b4a34; --c2: #4a5f4d; --c3: #8c4130; --c4: #4f6070; --papel: #f6f0e4;
   --serifa: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -13,7 +13,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --fundo: #1c1915; --vidro: rgba(28, 25, 21, .88); --folha: #25211c; --texto: #ece4d6; --suave: #a59c8d; --linha: #37312a;
-    --t-pensamento: #a3bba2; --t-livro: #cfa968; --t-video: #9bb0c4; --t-curso: #c9a3bf; --t-evento: #e39b87; --c0: #7a5426; --c1: #5f4230; --c2: #425646; --c3: #7c3a2c; --c4: #46586a;
+    --t-pensamento: #a3bba2; --t-livro: #cfa968; --t-video: #9bb0c4; --t-curso: #c9a3bf; --t-evento: #e39b87; --t-trecho: #d4c07a; --c0: #7a5426; --c1: #5f4230; --c2: #425646; --c3: #7c3a2c; --c4: #46586a;
     --destaque: #a3bba2; --sobre: #1c1915; --aviso: #e39b87; --chip: #2e2922; --sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
   }
 }
@@ -145,7 +145,9 @@ pre.copia { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; o
 }
 
 /* ---------- visuais leves ---------- */
-.t-pensamento { background: var(--t-pensamento); } .t-livro { background: var(--t-livro); } .t-video { background: var(--t-video); } .t-curso { background: var(--t-curso); } .t-evento { background: var(--t-evento); }
+.t-pensamento { background: var(--t-pensamento); } .t-livro { background: var(--t-livro); } .t-video { background: var(--t-video); } .t-curso { background: var(--t-curso); } .t-evento { background: var(--t-evento); } .t-trecho { background: var(--t-trecho); }
+.citacao { border-left: 3px solid var(--destaque); padding-left: 14px; font-style: italic; }
+.fonte-trecho { margin: 6px 0 12px; }
 
 /* calendário de constância */
 .cal { margin: 10px 0 0; }

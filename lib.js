@@ -5,6 +5,7 @@ export const TIPOS = {
   video: { nome: 'Vídeo', icone: '▶️' },
   curso: { nome: 'Curso', icone: '🎓' },
   evento: { nome: 'Evento', icone: '🗓️' },
+  trecho: { nome: 'Trecho', icone: '✍️' },
 };
 export const STATUS = ['lendo', 'lido', 'abandonado'];
 export const STATUS_CURSO = ['assistindo', 'concluído', 'pausado'];
@@ -58,6 +59,9 @@ export function lerNota(texto, caminho = '') {
     data: meta.data || '',
     hora: meta.hora || '',
     repete: REPETE[meta.repete] ? meta.repete : 'nao',
+    fonte: meta.fonte || '',
+    fonte_id: meta.fonte_id || '',
+    local: meta.local || '',
     tags: unicos((meta.tags || '').split(',').map(normTag).filter(Boolean)),
     criada: meta.criada || '',
     editada: meta.editada || '',
@@ -74,6 +78,7 @@ export function escreverNota(n) {
   add('titulo', n.titulo); add('status', n.status); add('nota', n.nota); add('link', n.link);
   add('plataforma', n.plataforma); add('aulas_feitas', n.aulas_feitas); add('aulas_total', n.aulas_total);
   add('data', n.data); add('hora', n.hora); add('repete', n.repete === 'nao' ? '' : n.repete);
+  add('fonte', n.fonte); add('fonte_id', n.fonte_id); add('local', n.local);
   add('tags', (n.tags || []).join(', '));
   add('criada', n.criada); add('editada', n.editada); add('rever_em', n.rever_em); add('revisada_em', n.revisada_em);
   L.push(`arquivada: ${n.arquivada ? 'sim' : 'nao'}`, '---', '', n.corpo || '');
@@ -96,7 +101,7 @@ export function buscar(notas, { termo = '', tipo = '', tag = '', arquivadas = fa
     .filter((n) => !tag || n.tags.includes(tag))
     .filter((n) => {
       if (!palavras.length) return true;
-      const palheiro = semAcento([n.titulo, n.corpo, n.link, n.tags.join(' ')].join(' '));
+      const palheiro = semAcento([n.titulo, n.corpo, n.link, n.fonte, n.local, n.tags.join(' ')].join(' '));
       return palavras.every((p) => palheiro.includes(p));
     })
     .sort(maisRecentesPrimeiro);
@@ -125,7 +130,8 @@ export function relacionadas(nota, todas, limite = 5) {
       const tagsComuns = o.tags.filter((t) => nota.tags.includes(t));
       let palavrasComuns = 0;
       for (const w of palavrasChave(o)) if (pn.has(w)) palavrasComuns++;
-      return { nota: o, tagsComuns, score: tagsComuns.length * 3 + palavrasComuns };
+      const mesmaFonte = (nota.tipo === 'trecho' && o.tipo === 'trecho' && ((nota.fonte_id && nota.fonte_id === o.fonte_id) || (!nota.fonte_id && nota.fonte && semAcento(nota.fonte) === semAcento(o.fonte)))) ? 3 : 0;
+      return { nota: o, tagsComuns, score: tagsComuns.length * 3 + palavrasComuns + mesmaFonte };
     })
     .filter((r) => r.score > 0)
     .sort((a, b) => b.score - a.score || maisRecentesPrimeiro(a.nota, b.nota))
@@ -149,10 +155,11 @@ export function promptParaClaude(resumo) {
     if (n.tags.length) partes.push(`  tags: ${n.tags.map((t) => '#' + t).join(' ')}`);
     if (n.tipo === 'livro' && (n.status || n.nota !== null)) partes.push(`  status: ${n.status || '-'}; nota: ${n.nota ?? '-'}`);
     if (n.link) partes.push(`  link: ${n.link}`);
+    if (n.tipo === 'trecho' && (n.fonte || n.local)) partes.push(`  fonte: ${[n.fonte, n.local].filter(Boolean).join(', ')}`);
     if (n.corpo && n.corpo !== tituloExibido(n)) partes.push('  ' + n.corpo.replace(/\n/g, '\n  '));
     return partes.join('\n');
   });
-  return `Você é meu assistente de reflexão. Abaixo estão minhas anotações pessoais de ${resumo.desde} a ${resumo.hoje} (pensamentos, livros e vídeos).
+  return `Você é meu assistente de reflexão. Abaixo estão minhas anotações pessoais de ${resumo.desde} a ${resumo.hoje} (pensamentos, livros, vídeos, cursos e trechos/insights de leituras).
 
 Por favor, em português simples:
 1. Resuma a semana em poucas linhas.
@@ -322,4 +329,67 @@ export function eventoParaICS(n, agora = new Date()) {
   if (n.corpo) L2.push(`DESCRIPTION:${icsTexto(n.corpo)}`);
   L2.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsTexto(tituloExibido(n))}`, n.hora ? 'TRIGGER:-PT30M' : 'TRIGGER;RELATED=START:PT9H', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR');
   return L2.map(dobrar).join('\r\n') + '\r\n';
+}
+
+// ---------- trechos / insights (passagens de livros, vídeos e cursos) ----------
+export const TIPOS_DE_FONTE = ['livro', 'video', 'curso'];
+
+// Fontes que podem receber trechos (mais recentes primeiro) — alimenta a lista de sugestões do formulário.
+export const fontesDisponiveis = (notas) =>
+  notas.filter((n) => !n.arquivada && TIPOS_DE_FONTE.includes(n.tipo) && n.titulo)
+    .sort((a, b) => (b.editada || b.criada || '').localeCompare(a.editada || a.criada || ''));
+
+// Acha a anotação-fonte de um trecho: pelo id guardado ou, na falta dele, pelo nome igual.
+export function fonteDoTrecho(trecho, notas) {
+  if (trecho.fonte_id) { const p = notas.find((n) => n.id === trecho.fonte_id); if (p) return p; }
+  const nome = semAcento(trecho.fonte);
+  return nome ? fontesDisponiveis(notas).find((n) => semAcento(n.titulo) === nome) || null : null;
+}
+
+// Trechos de um livro/vídeo/curso, na ordem em que foram anotados.
+export const trechosDaFonte = (fonte, notas) =>
+  notas.filter((n) => !n.arquivada && n.tipo === 'trecho' && (n.fonte_id === fonte.id || (!n.fonte_id && n.fonte && semAcento(n.fonte) === semAcento(fonte.titulo))))
+    .sort((a, b) => (a.criada || '').localeCompare(b.criada || ''));
+
+const nomeDaFonte = (t, fonteNota) => {
+  const titulo = fonteNota?.titulo || t.fonte;
+  if (!titulo) return '';
+  const tipo = fonteNota ? { livro: 'livro', video: 'vídeo', curso: 'curso' }[fonteNota.tipo] + ' ' : '';
+  return `${tipo}“${titulo}”${t.local ? ` (${t.local})` : ''}`;
+};
+
+// Texto pronto para colar no Claude e aprofundar UM trecho (o Claude pesquisa e estende a ideia).
+export function promptAprofundar(trecho, notas = []) {
+  const fonte = fonteDoTrecho(trecho, notas);
+  const origem = nomeDaFonte(trecho, fonte);
+  const rel = relacionadas(trecho, notas, 3).map((r) => `- ${tituloExibido(r.nota)}${r.nota.tags.length ? ' ' + r.nota.tags.map((t) => '#' + t).join(' ') : ''}`);
+  return `Quero aprofundar um insight que anotei${origem ? ' em ' + origem : ''}.
+
+O QUE REGISTREI:
+${trecho.corpo || tituloExibido(trecho)}
+${trecho.tags.length ? '\nTags: ' + trecho.tags.map((t) => '#' + t).join(' ') + '\n' : ''}${rel.length ? '\nOutras anotações minhas que podem se conectar:\n' + rel.join('\n') + '\n' : ''}
+Por favor, em português simples:
+1. Explique a ideia com outras palavras e dê um exemplo do dia a dia (se fizer sentido, ligado a finanças ou contabilidade).
+2. Se tiver acesso à internet, pesquise e traga contexto: de onde vem a ideia, autores ou estudos relacionados, críticas e limites. Cite as fontes.
+3. Mostre como ela se conecta às minhas outras anotações acima.
+4. Sugira 3 perguntas para eu refletir e 1 pequena ação prática para testar a ideia.
+5. Indique 2 ou 3 leituras ou vídeos para estender o tema.
+`;
+}
+
+// Todos os trechos de uma fonte juntos, para o Claude organizar e estender.
+export function promptTrechos(fonte, trechos) {
+  const itens = trechos.map((t, i) => `${i + 1}. ${t.local ? `[${t.local}] ` : ''}${(t.corpo || tituloExibido(t)).replace(/\n/g, '\n   ')}${t.tags.length ? `\n   tags: ${t.tags.map((x) => '#' + x).join(' ')}` : ''}`);
+  const tipo = { livro: 'livro', video: 'vídeo', curso: 'curso' }[fonte.tipo] || 'material';
+  return `Estes são os trechos e insights que registrei do ${tipo} “${fonte.titulo}”.
+
+${itens.join('\n\n') || '(nenhum trecho ainda)'}
+
+Por favor, em português simples:
+1. Resuma as ideias centrais que eu destaquei.
+2. Agrupe os trechos por tema e mostre como eles se conectam.
+3. Aponte o que eu parecia valorizar mais e se há ideias que se contradizem.
+4. Se tiver acesso à internet, pesquise e traga contexto, críticas e leituras complementares sobre esses temas. Cite as fontes.
+5. Sugira como aplicar 2 ou 3 dessas ideias na minha rotina e 3 perguntas para eu pensar.
+`;
 }
