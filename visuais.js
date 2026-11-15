@@ -49,7 +49,7 @@ export function ligarCalendario(raiz, c) {
 export function barrasDaSemana(s) {
   const topo = Math.max(3, s.max);
   const colunas = s.dias.map((d, i) => {
-    const seg = ['pensamento', 'livro', 'video'].map((t) => (d[t] ? `<i class="t-${t}" style="height:${(d[t] / topo * 100).toFixed(1)}%"></i>` : '')).join('');
+    const seg = Object.keys(L.TIPOS).map((t) => (d[t] ? `<i class="t-${t}" style="height:${(d[t] / topo * 100).toFixed(1)}%"></i>` : '')).join('');
     const rotulo = `${diaDaSemana(d.dia)} ${dataBR(d.dia)}: ${d.total ? plural(d.total, 'anotação', 'anotações') : 'nenhuma anotação'}`;
     return `<div class="dia${i === s.dias.length - 1 ? ' hoje' : ''}" role="img" aria-label="${esc(rotulo)}">
       <b>${d.total || ''}</b><div class="pilha">${seg}</div><span>${diaDaSemana(d.dia)}</span></div>`;
@@ -177,4 +177,26 @@ export function ligarMapa(raiz, aoEscolher) {
   };
   svg.addEventListener('click', (e) => { const g = e.target.closest('.no'); if (g) escolher(g); });
   svg.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const g = e.target.closest('.no'); if (g) { e.preventDefault(); escolher(g); } });
+}
+
+// ---------- cursos e eventos ----------
+const textoProgresso = (p) => (p.total ? `${p.feitas} de ${p.total} aulas` : p.feitas ? `${plural(p.feitas, 'aula', 'aulas')} assistidas` : '');
+const barra = (p) => (p.pct === null ? '' : `<span class="prog" role="img" aria-label="${p.pct}% concluído"><i style="width:${p.pct}%"></i></span>`);
+export function cursosAgora(lista) {
+  return lista.map((n) => {
+    const p = L.progressoCurso(n), sub = [n.plataforma, textoProgresso(p)].filter(Boolean).join(' · ');
+    return `<a class="curso" href="#/nota/${esc(n.id)}"><span class="tx">${esc(L.tituloExibido(n))}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}${barra(p)}</a>`;
+  }).join('');
+}
+export function detalheCurso(n) {
+  const p = L.progressoCurso(n);
+  const linha = [n.plataforma, n.status, textoProgresso(p) + (p.pct !== null ? ` (${p.pct}%)` : '')].filter(Boolean).join(' · ');
+  return `<p class="suave">${esc(linha)}</p>${barra(p)}`;
+}
+export function detalheEvento(n) {
+  const hoje = L.hojeISO(), prox = L.proximaOcorrencia(n, hoje);
+  const dia = n.data ? `${diaDaSemana(n.data)}, ${dataBR(n.data)}/${n.data.slice(0, 4)}${n.hora ? ' às ' + n.hora : ''}` : '';
+  const rep = n.repete !== 'nao' ? ` · ${L.REPETE[n.repete]}` : '';
+  const quando = prox ? `Próxima vez: ${L.quandoTexto(prox, hoje) || diaDaSemana(prox) + ', ' + dataBR(prox)}` : 'Este evento já passou.';
+  return `<p class="suave">${esc(dia + rep)}</p><p class="suave"><b>${esc(quando)}</b></p>`;
 }

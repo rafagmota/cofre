@@ -3,8 +3,12 @@ export const TIPOS = {
   pensamento: { nome: 'Pensamento', icone: '💭' },
   livro: { nome: 'Livro', icone: '📖' },
   video: { nome: 'Vídeo', icone: '▶️' },
+  curso: { nome: 'Curso', icone: '🎓' },
+  evento: { nome: 'Evento', icone: '🗓️' },
 };
 export const STATUS = ['lendo', 'lido', 'abandonado'];
+export const STATUS_CURSO = ['assistindo', 'concluído', 'pausado'];
+export const REPETE = { nao: 'não repete', semana: 'toda semana', mes: 'todo mês', ano: 'todo ano' };
 
 const pad = (n) => String(n).padStart(2, '0');
 export const hojeISO = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -39,6 +43,7 @@ export function lerNota(texto, caminho = '') {
     corpo = m[2].replace(/^\n/, '').replace(/\n+$/, '');
   }
   const id = meta.id || caminho.split('/').pop().replace(/\.md$/, '');
+  const numero = (v) => { if (v === undefined || v === '') return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
   const nota = meta.nota === undefined || meta.nota === '' ? null : Number(meta.nota);
   return {
     id, caminho,
@@ -47,6 +52,12 @@ export function lerNota(texto, caminho = '') {
     status: meta.status || '',
     nota: Number.isFinite(nota) ? nota : null,
     link: meta.link || '',
+    plataforma: meta.plataforma || '',
+    aulas_feitas: numero(meta.aulas_feitas),
+    aulas_total: numero(meta.aulas_total),
+    data: meta.data || '',
+    hora: meta.hora || '',
+    repete: REPETE[meta.repete] ? meta.repete : 'nao',
     tags: unicos((meta.tags || '').split(',').map(normTag).filter(Boolean)),
     criada: meta.criada || '',
     editada: meta.editada || '',
@@ -61,6 +72,8 @@ export function escreverNota(n) {
   const L = ['---', `id: ${n.id}`, `tipo: ${n.tipo}`];
   const add = (k, v) => { if (v !== undefined && v !== null && v !== '') L.push(`${k}: ${String(v).replace(/\n/g, ' ')}`); };
   add('titulo', n.titulo); add('status', n.status); add('nota', n.nota); add('link', n.link);
+  add('plataforma', n.plataforma); add('aulas_feitas', n.aulas_feitas); add('aulas_total', n.aulas_total);
+  add('data', n.data); add('hora', n.hora); add('repete', n.repete === 'nao' ? '' : n.repete);
   add('tags', (n.tags || []).join(', '));
   add('criada', n.criada); add('editada', n.editada); add('rever_em', n.rever_em); add('revisada_em', n.revisada_em);
   L.push(`arquivada: ${n.arquivada ? 'sim' : 'nao'}`, '---', '', n.corpo || '');
@@ -187,7 +200,7 @@ export function constancia(notas, hoje = hojeISO()) {
 // Barras da semana: quantas anotações por dia e por tipo.
 export function semanaPorDia(notas, hoje = hojeISO(), dias = 7) {
   const lista = [];
-  for (let i = dias - 1; i >= 0; i--) lista.push({ dia: addDias(hoje, -i), pensamento: 0, livro: 0, video: 0, total: 0 });
+  for (let i = dias - 1; i >= 0; i--) lista.push({ dia: addDias(hoje, -i), ...Object.fromEntries(Object.keys(TIPOS).map((t) => [t, 0])), total: 0 });
   const porDia = new Map(lista.map((x) => [x.dia, x]));
   for (const n of ativas(notas)) {
     const x = porDia.get(n.criada.slice(0, 10));
@@ -242,3 +255,71 @@ export function idDoYoutube(link) {
   } catch { return ''; }
 }
 export const miniaturaYoutube = (id) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+
+// ---------- cursos e eventos ----------
+export function progressoCurso(n) {
+  const feitas = n.aulas_feitas ?? 0, total = n.aulas_total || 0;
+  return { feitas, total, pct: total ? Math.min(100, Math.round((feitas / total) * 100)) : null };
+}
+export const cursosEmAndamento = (notas) =>
+  notas.filter((n) => !n.arquivada && n.tipo === 'curso' && n.status === 'assistindo')
+    .sort((a, b) => (b.editada || b.criada || '').localeCompare(a.editada || a.criada || ''));
+
+export const diasEntre = (a, b) => {
+  const [y1, m1, d1] = a.slice(0, 10).split('-').map(Number), [y2, m2, d2] = b.slice(0, 10).split('-').map(Number);
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 864e5);
+};
+// soma meses mantendo o dia (31 em mês de 30 dias vira 30)
+export function addMeses(iso, k) {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const alvo = new Date(y, m - 1 + k, 1);
+  const ultimo = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  return hojeISO(new Date(alvo.getFullYear(), alvo.getMonth(), Math.min(d, ultimo)));
+}
+// próxima data em que o evento acontece (hoje conta); '' se já passou e não repete
+export function proximaOcorrencia(n, hoje = hojeISO()) {
+  if (n.tipo !== 'evento' || !n.data) return '';
+  if (n.data >= hoje) return n.data;
+  if (n.repete === 'semana') return addDias(n.data, Math.ceil(diasEntre(n.data, hoje) / 7) * 7);
+  if (n.repete === 'mes' || n.repete === 'ano') {
+    const passo = n.repete === 'ano' ? 12 : 1;
+    const [y1, m1] = n.data.split('-').map(Number), [y2, m2] = hoje.split('-').map(Number);
+    let k = Math.max(0, Math.floor(((y2 - y1) * 12 + (m2 - m1)) / passo) * passo);
+    while (addMeses(n.data, k) < hoje) k += passo;
+    return addMeses(n.data, k);
+  }
+  return '';
+}
+export function proximosEventos(notas, hoje = hojeISO(), limite = 5) {
+  return notas.filter((n) => !n.arquivada && n.tipo === 'evento')
+    .map((nota) => ({ nota, quando: proximaOcorrencia(nota, hoje) }))
+    .filter((x) => x.quando)
+    .sort((a, b) => (a.quando + (a.nota.hora || '99')).localeCompare(b.quando + (b.nota.hora || '99')))
+    .slice(0, limite);
+}
+export function quandoTexto(dataISO, hoje = hojeISO()) {
+  const d = diasEntre(hoje, dataISO);
+  return d === 0 ? 'hoje' : d === 1 ? 'amanhã' : d > 1 && d < 7 ? `em ${d} dias` : d < 0 ? 'passou' : '';
+}
+
+// Arquivo .ics: o iPhone abre no Calendário, que toca o alarme mesmo com o Cofre fechado.
+const icsTexto = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const dobrar = (linha) => (linha.match(/.{1,60}/gsu) || ['']).join('\r\n ');
+const aaaammdd = (iso) => iso.slice(0, 10).replace(/-/g, '');
+export function eventoParaICS(n, agora = new Date()) {
+  const carimbo = agora.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const L2 = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Cofre//PT-BR//', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT', `UID:${n.id}@cofre`, `DTSTAMP:${carimbo}`];
+  if (n.hora) {
+    const [y, m, d] = n.data.split('-').map(Number), [h, mi] = n.hora.split(':').map(Number);
+    const f = (dt) => `${hojeISO(dt).replace(/-/g, '')}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
+    L2.push(`DTSTART:${f(new Date(y, m - 1, d, h, mi))}`, `DTEND:${f(new Date(y, m - 1, d, h + 1, mi))}`);
+  } else {
+    L2.push(`DTSTART;VALUE=DATE:${aaaammdd(n.data)}`, `DTEND;VALUE=DATE:${aaaammdd(addDias(n.data, 1))}`);
+  }
+  const freq = { semana: 'WEEKLY', mes: 'MONTHLY', ano: 'YEARLY' }[n.repete];
+  if (freq) L2.push(`RRULE:FREQ=${freq}`);
+  L2.push(`SUMMARY:${icsTexto(tituloExibido(n))}`);
+  if (n.corpo) L2.push(`DESCRIPTION:${icsTexto(n.corpo)}`);
+  L2.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsTexto(tituloExibido(n))}`, n.hora ? 'TRIGGER:-PT30M' : 'TRIGGER;RELATED=START:PT9H', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR');
+  return L2.map(dobrar).join('\r\n') + '\r\n';
+}

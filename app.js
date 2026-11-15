@@ -163,13 +163,32 @@ window.addEventListener('hashchange', rotear);
 const dataCurta = (iso) => (iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : '');
 function linhaNota(n, extra = '') {
   const tags = n.tags.map((t) => '#' + t).join(' ');
-  return `<a class="linha ${extra}" href="#/nota/${esc(n.id)}"><span class="ic">${L.TIPOS[n.tipo].icone}</span><span class="tx">${esc(L.tituloExibido(n))}</span>${tags ? `<span class="tg">${esc(tags)}</span>` : ''}<span class="dt">${dataCurta(n.rever_em && extra ? n.rever_em : n.criada)}</span></a>`;
+  return `<a class="linha ${extra}" href="#/nota/${esc(n.id)}"><span class="ic">${L.TIPOS[n.tipo].icone}</span><span class="tx">${esc(L.tituloExibido(n))}</span>${tags ? `<span class="tg">${esc(tags)}</span>` : ''}<span class="dt">${dataCurta(n.tipo === 'evento' ? (L.proximaOcorrencia(n) || n.data) : n.rever_em && extra ? n.rever_em : n.criada)}</span></a>`;
+}
+function linhaEvento({ nota: n, quando }) {
+  const hoje = L.hojeISO();
+  const partes = [L.quandoTexto(quando, hoje), n.hora, n.repete !== 'nao' ? L.REPETE[n.repete] : ''].filter(Boolean).join(' · ');
+  return `<a class="linha ev ${quando === hoje ? 'agora' : ''}" href="#/nota/${esc(n.id)}"><span class="ic">${L.TIPOS.evento.icone}</span><span class="tx">${esc(L.tituloExibido(n))}</span>${partes ? `<span class="tg">${esc(partes)}</span>` : ''}<span class="dt">${dataCurta(quando)}</span></a>`;
+}
+
+// Entrega o evento ao iPhone/PC como arquivo de calendário (.ics): o Calendário é quem toca o alarme.
+async function entregarCalendario(n) {
+  const arq = new File([L.eventoParaICS(n)], 'evento.ics', { type: 'text/calendar' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [arq] })) { await navigator.share({ files: [arq], title: L.tituloExibido(n) }); return; }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  const url = URL.createObjectURL(arq), a = document.createElement('a');
+  a.href = url; a.download = 'evento.ics'; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  aviso('Arquivo do evento baixado: abra-o para adicionar ao Calendário.', 4500);
 }
 
 function telaPainel() {
   const hoje = L.hojeISO();
   const lembretes = L.lembretesDeHoje(notas, hoje);
   const est = L.estante(notas);
+  const proximos = L.proximosEventos(notas, hoje);
+  const cursos = L.cursosEmAndamento(notas);
   const cons = L.constancia(notas, hoje);
   const ultimas = [...notas].filter((n) => !n.arquivada).sort(L.maisRecentesPrimeiro).slice(0, 5);
   const t = L.totais(notas);
@@ -184,6 +203,10 @@ function telaPainel() {
     <div class="cartao">${V.calendario(cons)}</div>
     <h2>Rever hoje</h2>
     <div class="cartao">${lembretes.length ? lembretes.map((n) => linhaNota(n, 'aviso-data')).join('') : '<div class="vazio">Nada para rever hoje.</div>'}</div>
+    <h2>Próximos eventos</h2>
+    <div class="cartao">${proximos.length ? proximos.map(linhaEvento).join('') : '<div class="vazio">Nenhum evento marcado. Toque em “Anotar” e escolha Evento.</div>'}</div>
+    <h2>Cursos</h2>
+    <div class="cartao">${cursos.length ? V.cursosAgora(cursos) : '<div class="vazio">Nenhum curso em andamento.</div>'}</div>
     <h2>Lendo agora</h2>
     <div class="cartao">${est.lendo.length ? V.lendoAgora(est.lendo) : '<div class="vazio">Nenhum livro marcado como “lendo”.</div>'}</div>
     ${est.lidos.length ? `<h2>Estante</h2><div class="cartao">${V.estanteLidos(est)}</div>` : ''}
@@ -200,7 +223,7 @@ function telaLista() {
     <h1>Lista</h1>
     <input id="busca" type="search" placeholder="Buscar (ex.: dinheiro)" value="${esc(filtro.termo)}" autocomplete="off">
     <div class="chips" id="tipos">
-      ${[['', 'Tudo'], ['pensamento', '💭'], ['livro', '📖'], ['video', '▶️']].map(([v, r]) => `<button class="chip ${filtro.tipo === v ? 'on' : ''}" data-tipo="${v}">${r}</button>`).join('')}
+      ${[['', 'Tudo'], ['pensamento', '💭'], ['livro', '📖'], ['video', '▶️'], ['curso', '🎓'], ['evento', '🗓️']].map(([v, r]) => `<button class="chip ${filtro.tipo === v ? 'on' : ''}" data-tipo="${v}">${r}</button>`).join('')}
       <button class="chip ${filtro.arquivadas ? 'on' : ''}" id="arq">Arquivadas</button>
     </div>
     ${tags.length ? `<div class="chips" id="tags">${tags.map(([t, q]) => `<button class="chip ${filtro.tag === t ? 'on' : ''}" data-tag="${esc(t)}">#${esc(t)} ${q}</button>`).join('')}</div>` : ''}
@@ -233,6 +256,8 @@ function telaNota(id) {
       ${n.tipo === 'livro' ? `<div class="cabeca">${V.capaLivro(n.titulo)}<div>` : ''}
       <h1 style="margin-top:8px">${esc(n.titulo || (n.tipo === 'pensamento' ? '' : '(sem título)'))}</h1>
       ${n.tipo === 'livro' ? `<p class="suave">Status: ${esc(n.status || '-')} · Nota: ${n.nota ?? '-'}</p></div></div>` : ''}
+      ${n.tipo === 'curso' ? V.detalheCurso(n) : ''}
+      ${n.tipo === 'evento' ? V.detalheEvento(n) : ''}
       ${linkOk ? `<p><a href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">${esc(n.link)}</a></p>` : n.link ? `<p class="suave">${esc(n.link)}</p>` : ''}
       <div class="corpo">${esc(n.corpo)}</div>
       ${n.tags.length ? `<div class="chips">${n.tags.map((t) => `<a class="chip" href="#/lista" data-tag="${esc(t)}">#${esc(t)}</a>`).join('')}</div>` : ''}
@@ -240,8 +265,9 @@ function telaNota(id) {
     </div>
     <div class="acoes">
       <a class="b" href="#/editar/${esc(n.id)}" style="text-align:center">Editar</a>
-      <button class="b sec" id="r7">Rever em 7 dias</button>
-      <button class="b sec" id="r30">Rever em 30 dias</button>
+      ${n.tipo === 'evento' ? '' : '<button class="b sec" id="r7">Rever em 7 dias</button><button class="b sec" id="r30">Rever em 30 dias</button>'}
+      ${n.tipo === 'curso' && n.status === 'assistindo' ? '<button class="b sec" id="aula">Assisti mais 1 aula</button>' : ''}
+      ${n.tipo === 'evento' ? '<button class="b sec" id="cal">Adicionar ao Calendário</button>' : ''}
       ${n.rever_em ? '<button class="b sec" id="visto">Marcar como revisada</button>' : ''}
       <button class="b ${n.arquivada ? 'sec' : 'perigo'}" id="arq">${n.arquivada ? 'Desfazer arquivamento' : 'Arquivar'}</button>
     </div>
@@ -254,8 +280,14 @@ function telaNota(id) {
     try { await salvarNota({ ...n, ...campos, editada: L.agoraISO() }, msg); aviso(ok); telaNota(id); }
     catch (e) { const er = $('#erro'); er.textContent = e.message; er.hidden = false; }
   };
-  $('#r7').onclick = () => mudar({ rever_em: L.addDias(L.hojeISO(), 7), revisada_em: '' }, 'Rever em 7 dias', 'Lembrete marcado para 7 dias');
-  $('#r30').onclick = () => mudar({ rever_em: L.addDias(L.hojeISO(), 30), revisada_em: '' }, 'Rever em 30 dias', 'Lembrete marcado para 30 dias');
+  if ($('#r7')) $('#r7').onclick = () => mudar({ rever_em: L.addDias(L.hojeISO(), 7), revisada_em: '' }, 'Rever em 7 dias', 'Lembrete marcado para 7 dias');
+  if ($('#r30')) $('#r30').onclick = () => mudar({ rever_em: L.addDias(L.hojeISO(), 30), revisada_em: '' }, 'Rever em 30 dias', 'Lembrete marcado para 30 dias');
+  const aula = $('#aula');
+  if (aula) aula.onclick = () => {
+    const feitas = (n.aulas_feitas || 0) + 1, fim = n.aulas_total && feitas >= n.aulas_total;
+    mudar({ aulas_feitas: n.aulas_total ? Math.min(feitas, n.aulas_total) : feitas, status: fim ? 'concluído' : n.status }, 'Aula assistida', fim ? 'Curso concluído! 🎉' : 'Aula registrada');
+  };
+  const cal = $('#cal'); if (cal) cal.onclick = () => entregarCalendario(n);
   const v = $('#visto'); if (v) v.onclick = () => mudar({ rever_em: '', revisada_em: L.hojeISO() }, 'Revisada', 'Marcada como revisada');
   $('#arq').onclick = () => {
     if (!n.arquivada && !confirm('Arquivar esta anotação? Ela some da lista, mas não é apagada e dá para desfazer.')) return;
@@ -289,6 +321,32 @@ function telaForm(tipo, existente) {
         <input id="nota" type="number" min="0" max="10" step="0.5" inputmode="decimal" value="${n?.nota ?? ''}">
         <label for="corpo">O que levo dele</label>
         <textarea id="corpo">${esc(n?.corpo)}</textarea>` : ''}
+      ${tipo === 'curso' ? `
+        <label for="titulo">Nome do curso</label>
+        <input id="titulo" required value="${esc(n?.titulo)}">
+        <label for="plataforma">Onde assiste</label>
+        <input id="plataforma" placeholder="Udemy, Alura, YouTube…" value="${esc(n?.plataforma)}">
+        <label for="status">Situação</label>
+        <select id="status">${L.STATUS_CURSO.map((s) => `<option ${((n?.status) || 'assistindo') === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <label for="feitas">Aulas assistidas</label>
+        <input id="feitas" type="number" min="0" step="1" inputmode="numeric" value="${n?.aulas_feitas ?? ''}">
+        <label for="total">Total de aulas</label>
+        <input id="total" type="number" min="0" step="1" inputmode="numeric" value="${n?.aulas_total ?? ''}">
+        <label for="link">Link do curso (opcional)</label>
+        <input id="link" type="url" inputmode="url" value="${esc(n?.link)}">
+        <label for="corpo">Anotações</label>
+        <textarea id="corpo">${esc(n?.corpo)}</textarea>` : ''}
+      ${tipo === 'evento' ? `
+        <label for="titulo">O que vai acontecer?</label>
+        <input id="titulo" required value="${esc(n?.titulo)}">
+        <label for="data">Data</label>
+        <input id="data" type="date" required value="${esc(n?.data)}">
+        <label for="hora">Hora (opcional)</label>
+        <input id="hora" type="time" value="${esc(n?.hora)}">
+        <label for="repete">Repete?</label>
+        <select id="repete">${Object.entries(L.REPETE).map(([k, v]) => `<option value="${k}" ${(n?.repete || 'nao') === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <label for="corpo">Detalhes (opcional)</label>
+        <textarea id="corpo">${esc(n?.corpo)}</textarea>` : ''}
       ${tipo === 'video' ? `
         <label for="link">Link do vídeo</label>
         <input id="link" type="url" inputmode="url" required placeholder="Cole o link aqui" value="${esc(n?.link)}">
@@ -300,7 +358,7 @@ function telaForm(tipo, existente) {
       <label for="tags">Tags</label>
       <input id="tags" value="${esc(tagsExistentes)}" placeholder="#dinheiro #habitos" autocapitalize="off">
       <div class="chips" id="sug"></div>
-      ${campoRever}
+      ${tipo === 'evento' ? '' : campoRever}
       <p class="erro" id="erro" hidden></p>
       <div class="acoes"><button class="b" id="ok">Salvar</button><a class="b sec" href="${ed ? '#/nota/' + esc(n.id) : '#/'}" style="text-align:center">Cancelar</a></div>
     </form>`;
@@ -346,8 +404,8 @@ function telaForm(tipo, existente) {
     $('#link').addEventListener('input', mini); $('#link').addEventListener('change', mini); mini();
   }
 
-  $('#rever').onchange = (e) => { $('#reverData').hidden = e.target.value !== 'data'; };
-  if (n?.rever_em) { $('#rever').value = 'data'; $('#reverData').hidden = false; $('#reverData').value = n.rever_em; }
+  if ($('#rever')) $('#rever').onchange = (e) => { $('#reverData').hidden = e.target.value !== 'data'; };
+  if (n?.rever_em && $('#rever')) { $('#rever').value = 'data'; $('#reverData').hidden = false; $('#reverData').value = n.rever_em; }
 
   $('#f').onsubmit = async (e) => {
     e.preventDefault();
@@ -357,9 +415,12 @@ function telaForm(tipo, existente) {
     const r = val('rever');
     const rever = r === '7' || r === '30' ? L.addDias(L.hojeISO(), Number(r)) : r === 'data' ? val('reverData') : '';
     const agora = L.agoraISO();
-    const base = n ? { ...n } : { id: L.novoId(), tipo, criada: agora, arquivada: false, status: '', nota: null, link: '', titulo: '', revisada_em: '' };
+    const base = n ? { ...n } : { id: L.novoId(), tipo, criada: agora, arquivada: false, status: '', nota: null, link: '', titulo: '', revisada_em: '', plataforma: '', aulas_feitas: null, aulas_total: null, data: '', hora: '', repete: 'nao' };
     const nova = { ...base, corpo, tags, rever_em: rever, editada: n ? agora : '' };
     if (tipo === 'livro') { nova.titulo = val('titulo'); nova.status = val('status'); nova.nota = val('nota') === '' ? null : Number(val('nota')); }
+    const num = (id) => (val(id) === '' ? null : Number(val(id)));
+    if (tipo === 'curso') { nova.titulo = val('titulo'); nova.plataforma = val('plataforma'); nova.status = val('status'); nova.aulas_feitas = num('feitas'); nova.aulas_total = num('total'); nova.link = val('link'); }
+    if (tipo === 'evento') { nova.titulo = val('titulo'); nova.data = val('data'); nova.hora = val('hora'); nova.repete = val('repete') || 'nao'; }
     if (tipo === 'video') { nova.link = val('link'); nova.titulo = val('titulo') || nova.link; }
     if (tipo === 'pensamento' && !corpo) return;
     $('#ok').disabled = true; $('#ok').textContent = 'Salvando…';

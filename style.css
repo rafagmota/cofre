@@ -5,7 +5,7 @@
 :root {
   --fundo: #f6f0e4; --vidro: rgba(246, 240, 228, .88); --folha: #fcf9f2; --texto: #2d2823; --suave: #675e53; --linha: #e3dac9;
   --destaque: #4f6552; --sobre: #ffffff; --aviso: #9b4332; --chip: #ece4d3; --sombra: 0 1px 2px rgba(60, 45, 20, .06), 0 8px 24px rgba(60, 45, 20, .07);
-  --t-pensamento: #4f6552; --t-livro: #a07a3f; --t-video: #5f7384;
+  --t-pensamento: #4f6552; --t-livro: #a07a3f; --t-video: #5f7384; --t-curso: #86617b; --t-evento: #a8523f;
   --c0: #8a5f2b; --c1: #6b4a34; --c2: #4a5f4d; --c3: #8c4130; --c4: #4f6070; --papel: #f6f0e4;
   --serifa: "Newsreader", "Iowan Old Style", Charter, Georgia, serif;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -13,7 +13,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --fundo: #1c1915; --vidro: rgba(28, 25, 21, .88); --folha: #25211c; --texto: #ece4d6; --suave: #a59c8d; --linha: #37312a;
-    --t-pensamento: #a3bba2; --t-livro: #cfa968; --t-video: #9bb0c4; --c0: #7a5426; --c1: #5f4230; --c2: #425646; --c3: #7c3a2c; --c4: #46586a;
+    --t-pensamento: #a3bba2; --t-livro: #cfa968; --t-video: #9bb0c4; --t-curso: #c9a3bf; --t-evento: #e39b87; --c0: #7a5426; --c1: #5f4230; --c2: #425646; --c3: #7c3a2c; --c4: #46586a;
     --destaque: #a3bba2; --sobre: #1c1915; --aviso: #e39b87; --chip: #2e2922; --sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
   }
 }
@@ -78,8 +78,8 @@ h2 { font: italic 400 18px/1.3 var(--serifa); color: var(--suave); margin: 32px 
 }
 a.chip, .chips span.chip { color: var(--destaque); }
 .chip.on { background: var(--destaque); color: var(--sobre); }
-.seg { display: flex; gap: 6px; margin-bottom: 8px; }
-.seg .chip { flex: 1; justify-content: center; white-space: nowrap; font-size: 14px; padding: 4px 2px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.seg .chip { flex: 1 0 30%; justify-content: center; white-space: nowrap; font-size: 14px; padding: 4px 2px; }
 
 /* formulários */
 label { display: block; font-size: 14px; color: var(--suave); margin: 22px 0 6px; }
@@ -145,7 +145,7 @@ pre.copia { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; o
 }
 
 /* ---------- visuais leves ---------- */
-.t-pensamento { background: var(--t-pensamento); } .t-livro { background: var(--t-livro); } .t-video { background: var(--t-video); }
+.t-pensamento { background: var(--t-pensamento); } .t-livro { background: var(--t-livro); } .t-video { background: var(--t-video); } .t-curso { background: var(--t-curso); } .t-evento { background: var(--t-evento); }
 
 /* calendário de constância */
 .cal { margin: 10px 0 0; }
@@ -219,3 +219,13 @@ svg.mapa { display: block; width: 100%; height: auto; max-height: 300px; margin-
 .mapa .no.on .bol { fill: var(--destaque); } .mapa .no.on .qt { fill: var(--sobre); } .mapa .no.on .rot { fill: var(--texto); font-weight: 500; }
 .mapa .no:focus-visible .bol { stroke-width: 3; }
 .mapa-notas { margin-top: 8px; } .mapa-notas:empty { display: none; }
+
+/* cursos (barra fina de progresso) e eventos */
+.curso { display: block; padding: 14px 4px 16px; border-bottom: 1px solid var(--linha); color: var(--texto); min-height: 56px; }
+.curso:last-child { border-bottom: 0; }
+.curso .tx { display: block; font: 500 18px/1.35 var(--serifa); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.curso .sub { display: block; font-size: 14px; color: var(--suave); margin-top: 1px; }
+.prog { display: block; height: 4px; margin-top: 9px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+.prog i { display: block; height: 100%; border-radius: 4px; background: var(--destaque); }
+.folha .prog { margin: 4px 0 14px; }
+.linha.ev.agora .dt, .linha.ev.agora .tg { color: var(--aviso); font-weight: 600; }
