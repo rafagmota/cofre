@@ -248,6 +248,7 @@ function telaNota(id) {
   const v = $('#visto'); if (v) v.onclick = () => mudar({ rever_em: '', revisada_em: L.hojeISO() }, 'Revisada', 'Marcada como revisada');
   $('#arq').onclick = () => {
     if (!n.arquivada && !confirm('Arquivar esta anotação? Ela some da lista, mas não é apagada e dá para desfazer.')) return;
+    if (n.arquivada) filtro.arquivadas = false; // ao restaurar, a Lista volta a mostrar as anotações normais
     mudar({ arquivada: !n.arquivada }, n.arquivada ? 'Desarquivar' : 'Arquivar', n.arquivada ? 'Anotação restaurada' : 'Arquivada (dá para desfazer)');
   };
 }
