@@ -39,6 +39,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid var(--destaque); 
 button.b { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 13px 18px; background: var(--destaque); color: #fff; cursor: pointer; }
 button.b.sec { background: var(--chip); color: var(--texto); border: 1px solid var(--linha); }
 button.b.perigo { background: transparent; color: var(--aviso); border: 1px solid var(--aviso); }
+a.b { display: block; text-decoration: none; background: var(--destaque); color: #fff; border-radius: 12px; padding: 13px 18px; font-weight: 600; text-align: center; }
+a.b.sec { background: var(--chip); color: var(--texto); border: 1px solid var(--linha); }
 button.b:disabled { opacity: .55; }
 .acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .acoes .b { flex: 1 1 auto; }
