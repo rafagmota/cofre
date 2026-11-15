@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Cofre</title>
-  <meta name="theme-color" content="#1f3a34">
+  <meta name="theme-color" content="#f6f0e4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1c1915" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex, nofollow">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -13,20 +15,21 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
   <link rel="icon" href="icon-192.png">
+  <link rel="preload" href="fontes/newsreader.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header id="topo">
-    <a href="#/" class="marca">🔒 Cofre</a>
+    <a href="#/" class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Cofre</a>
     <span id="estado" aria-live="polite"></span>
-    <a href="#/ajustes" class="engrenagem" aria-label="Ajustes">⚙︎</a>
+    <a href="#/ajustes" class="engrenagem" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></a>
   </header>
   <main id="app"></main>
   <nav id="abas" hidden>
-    <a href="#/" data-aba="painel">🏠<span>Painel</span></a>
-    <a href="#/lista" data-aba="lista">📚<span>Lista</span></a>
-    <a href="#/nova" data-aba="nova" class="destaque">＋<span>Anotar</span></a>
-    <a href="#/semana" data-aba="semana">🔗<span>Semana</span></a>
+    <a href="#/" data-aba="painel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8.5a.5.5 0 0 1-.5.5H15v-6H9v6H4.5a.5.5 0 0 1-.5-.5z"/></svg><span>Painel</span></a>
+    <a href="#/lista" data-aba="lista"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M8 6.5h12M8 12h12M8 17.5h12M4 6.5h.01M4 12h.01M4 17.5h.01"/></svg><span>Lista</span></a>
+    <a href="#/nova" data-aba="nova" class="destaque"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Anotar</span></a>
+    <a href="#/semana" data-aba="semana"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/></svg><span>Semana</span></a>
   </nav>
   <div id="aviso" role="status" hidden></div>
   <script type="module" src="app.js"></script>

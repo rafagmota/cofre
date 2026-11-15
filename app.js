@@ -105,7 +105,8 @@ function telaPin() {
   $('#abas').hidden = true;
   app.innerHTML = `
     <div class="cx cartao">
-      <h1>🔒 Cofre</h1>
+      <h1>Cofre</h1>
+      <p class="suave">Digite seu PIN para abrir.</p>
       <form id="f">
         <label for="pin">PIN</label>
         <input id="pin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" autofocus required>
@@ -219,7 +220,7 @@ function telaNota(id) {
   const linkOk = /^https?:\/\//i.test(n.link);
   app.innerHTML = `
     <p><a href="#/lista">← Lista</a></p>
-    <div class="cartao ${n.arquivada ? 'arquivada' : ''}">
+    <div class="folha ${n.arquivada ? 'arquivada' : ''}">
       <div class="suave">${L.TIPOS[n.tipo].icone} ${L.TIPOS[n.tipo].nome} · ${esc(n.criada.slice(0, 10).split('-').reverse().join('/'))}${n.arquivada ? ' · <b>ARQUIVADA</b>' : ''}</div>
       <h1 style="margin-top:8px">${esc(n.titulo || (n.tipo === 'pensamento' ? '' : '(sem título)'))}</h1>
       ${n.tipo === 'livro' ? `<p class="suave">Status: ${esc(n.status || '-')} · Nota: ${n.nota ?? '-'}</p>` : ''}
